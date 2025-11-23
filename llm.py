@@ -1,37 +1,33 @@
 # llm.py
+import requests
 
-# Optional Gemini import (only if installed)
-try:
-    from google import genai
-    GEMINI_AVAILABLE = True
-except ImportError:
-    GEMINI_AVAILABLE = False
+def groq_answer(api_key: str, prompt: str):
+    """
+    Send a prompt to Groq LLaMA-3 API if key provided.
+    Fallback to free local model (dummy) if API fails or key missing.
+    """
+    # If no API key, use dummy free response
+    if not api_key:
+        return f"[Free model] I understood: {prompt[:100]}..."  # simple dummy response
 
-def configure_gemini(api_key: str):
-    """
-    Configure and return a GenAI client for Gemini.
-    """
-    if not GEMINI_AVAILABLE:
-        raise ImportError("google-genai package is not installed")
-    return genai.Client(api_key=api_key)
-
-def gemini_answer(client, message: str):
-    """
-    Generate a response from Gemini using the GenAI client.
-    """
-    if not GEMINI_AVAILABLE:
-        return "(Gemini not available)"
     try:
-        response = client.models.generate_content(
-            model="gemini-1.5-flash",
-            contents=message
-        )
-        return response.text
+        # Correct Groq endpoint
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}"
+        }
+        data = {
+            "model": "llama3-8b-8192",
+            "messages": [
+                {"role": "system", "content": "You are a helpful finance assistant."},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.4
+        }
+        response = requests.post(url, headers=headers, json=data, timeout=30)
+        response.raise_for_status()
+        return response.json()["choices"][0]["message"]["content"]
     except Exception as e:
-        return f"(Gemini Error) {str(e)}"
-
-def llama3_answer(message: str):
-    """
-    Local LLaMA 3 fallback (dummy response)
-    """
-    return f"(LLaMA 3 Reply) I understood: {message}"
+        # Fallback free response if API fails
+        return f"[Free model fallback] Could not reach Groq API: {str(e)}\nI understood: {prompt[:100]}..."
